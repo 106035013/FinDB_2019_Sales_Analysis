@@ -1,0 +1,74 @@
+---
+title: "sales analysis"
+author: "張瑜君"
+date: "2019年4月29日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#1.Load libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(readxl)
+library(writexl)
+```
+
+
+#2.Importing Files 
+```{r}
+bikes_tbl <- read_excel("bikes.xlsx")
+bikeshops_tbl <- read_excel("bikeshops.xlsx")
+orderlines_tbl <- read_excel("orderlines.xlsx")
+```
+
+
+#3.Examining Data
+```{r}
+bikes_tbl
+bikeshops_tbl %>% glimpse()
+```
+
+
+#4.Joining Data
+```{r}
+left_join(orderlines_tbl, bikes_tbl, by = c("product.id"="bike.id"))
+orderlines_bikes_tbl <- orderlines_tbl %>% left_join(bikes_tbl, by = c("product.id"="bike.id"))
+orderlines_tbl %>% left_join(bikes_tbl, by = c("product.id"="bike.id")) %>% 
+                   left_join(bikeshops_tbl, by = c("customer.id" = "bikeshop.id"))
+bikes_orderlines_joined_tbl<-orderlines_tbl %>% left_join(bikes_tbl, by = c("product.id" = "bike.id")) %>% 
+  left_join(bikeshops_tbl, by = c("customer.id" = "bikeshop.id"))
+bikes_orderlines_joined_tbl
+bikes_orderlines_joined_tbl %>% glimpse()
+```
+
+
+#5.Wrangling Data
+
+共有order_date、order_id、order_line、quantity、price、total_price、model、category_1、category_2、frame_material、bikeshop_name、city、state。
+```{r}
+bikes_orderlines_wrangled_tbl <- bikes_orderlines_joined_tbl %>%
+  separate(description,
+           into = c("category.1", "category.2", "frame.material"),
+           sep = " - ",
+           remove = TRUE) %>%
+  separate(location,
+           into = c("city", "state"),
+           sep  = ", ",
+           remove = FALSE) %>%
+  mutate(total.price = price * quantity) %>%
+  select(-...1, -location) %>%
+  select(-ends_with(".id")) %>%
+  bind_cols(bikes_orderlines_joined_tbl %>% select(order.id)) %>%
+  select(contains("date"), contains("id"), contains("order"),
+         quantity, price, total.price,
+         everything()) %>%
+  rename(order_date = order.date) %>%
+  set_names(names(.) %>% str_replace_all("\\.", "_")) 
+bikes_orderlines_wrangled_tbl %>% glimpse()
+```
+
