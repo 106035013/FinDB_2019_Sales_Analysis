@@ -1,0 +1,401 @@
+---
+title: "hw13"
+author: "張瑜君"
+date: "2019年5月27日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##checkpoint_3_forcats：
+```{r}
+library(tidyverse)
+library(tidyquant)
+
+bike_orderlines_tbl <- read_rds("data_wrangled_student/bike_orderlines.rds")
+
+bike_orderlines_tbl
+```
+
+
+#1.Factor Basics 
+
+#2.Motivating Example
+
+#Manipulation
+```{r}
+sales_by_cat_2_tbl <- bike_orderlines_tbl %>%
+    
+    select(category_2, total_price) %>%
+    
+    group_by(category_2) %>%
+    summarize(sales = sum(total_price)) %>%
+    ungroup() %>%
+    
+    arrange(desc(sales)) %>%
+    
+    mutate(category_2 = category_2 %>% as_factor() %>% fct_rev())
+```
+
+
+#Plotting
+```{r}
+sales_by_cat_2_tbl %>%
+    ggplot(aes(x = sales, y = category_2)) +
+    geom_point(size = 5, color = "#2c3e50") +
+    labs(title = "Sales By Category 2") +
+    scale_x_continuous(labels = scales::dollar_format()) +
+    theme_tq() +
+    expand_limits(x = 0)
+
+plot_sales <- function(data) {
+    data %>%
+        ggplot(aes(x = sales, y = category_2)) +
+        geom_point(size = 5, color = "#2c3e50") +
+        labs(title = "Sales By Category 2") +
+        scale_x_continuous(labels = scales::dollar_format()) +
+        theme_tq() +
+        expand_limits(x = 0)
+}
+
+sales_by_cat_2_tbl %>%
+    plot_sales()
+```
+
+
+#3.Forcats Basics
+
+#3-1.Inspecting Factors
+
+#Vector
+```{r}
+sales_by_cat_2_tbl %>% pull(category_2) %>% levels()
+
+sales_by_cat_2_tbl %>% pull(category_2) %>% as.numeric()
+```
+
+
+#Tibble
+```{r}
+sales_by_cat_2_tbl %>%
+    mutate(category_2 = category_2 %>% fct_rev() %>% fct_rev()) %>%
+    mutate(
+        label = category_2 %>% as.character(),
+        value = category_2 %>% as.numeric()
+    )
+```
+
+
+#3-2.Creating Factors: as_factor( ) vs as.factor( )
+```{r}
+sales_by_cat_2_tbl %>%
+    mutate(
+        category_2           = as.character(category_2),
+        category_2_as_factor = as_factor(category_2) %>% as.numeric(),
+        category_2_as.factor = as.factor(category_2) %>% as.numeric()
+    )
+```
+
+
+#3-3.Reordering Factors: fct_reorder( ) and fct_rev( )
+```{r}
+sales_by_cat_2_tbl %>%
+    arrange(desc(sales)) %>%
+    mutate(sales_negative = -sales) %>%
+    mutate(
+        category_2 = category_2 %>% fct_reorder(sales_negative),
+        values     = category_2 %>% as.numeric()) %>%
+    
+    plot_sales()
+```
+
+
+#3-4.Time-Based Reordering: fct_reorder2( ) 
+```{r}
+sales_by_cat_2_q_tbl <- bike_orderlines_tbl %>%
+    
+    mutate(order_date = order_date %>% floor_date("quarter") %>% ymd()) %>%
+    
+    group_by(category_2, order_date) %>%
+    summarise(sales = sum(total_price)) %>%
+    ungroup()
+
+sales_by_cat_2_q_tbl
+
+
+sales_by_cat_2_q_tbl %>%
+    
+    mutate(category_2 = category_2 %>% fct_reorder2(order_date, sales)) %>%
+    
+    ggplot(aes(x = order_date, y = sales, color = category_2)) +
+    geom_point() +
+    geom_line() +
+    facet_wrap(~ category_2) +
+    
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::dollar_format(scale = 1e-6, suffix = "M"))
+```
+
+
+#3-5.Creating "Other" Category - fct_lump( ) & fct_relevel( ) 
+```{r}
+sales_by_cat_2_tbl %>%
+    
+    mutate(category_2 = category_2 %>% fct_lump(n = 6, 
+                                                w = sales, 
+                                                other_level = "All Other Bike Categories")) %>%
+    
+    group_by(category_2) %>%
+    summarize(sales = sum(sales)) %>%
+    
+    mutate(category_2 = category_2 %>% fct_relevel("All Other Bike Categories", after = 0)) %>%
+    
+    plot_sales()
+```
+
+
+##02_ggplot2_geometries_1：
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tidyquant)
+
+bike_orderlines_tbl <- read_rds("data_wrangled_student/bike_orderlines.rds")
+
+glimpse(bike_orderlines_tbl)
+```
+
+
+#1.Point / Scatter Plots
+
+#Goal：Explain relationship between order value and quantity of bikes sold
+
+#Data Manipulation
+```{r}
+order_value_tbl <- bike_orderlines_tbl %>%
+    
+    select(order_id, order_line, total_price, quantity) %>%
+    
+    group_by(order_id) %>%
+    summarize(
+        total_quantity = sum(quantity),
+        total_price    = sum(total_price)
+    ) %>%
+    ungroup()
+```
+
+
+#Scatter Plot
+```{r}
+order_value_tbl %>%
+    
+    ggplot(aes(x = total_quantity, y = total_price)) +
+    
+    geom_point(alpha = 0.5, size = 2) +
+    geom_smooth(method = "lm", se = FALSE)
+```
+
+
+#2.Line Plots
+
+#Goal：Describe revenue by Month, expose cyclic nature
+
+#Data Manipulation
+```{r}
+revenue_by_month_tbl <- bike_orderlines_tbl %>%
+    
+    select(order_date, total_price) %>%
+    
+    mutate(year_month = floor_date(order_date, "months") %>% ymd()) %>%
+    
+    group_by(year_month) %>%
+    summarize(revenue = sum(total_price)) %>%
+    ungroup()
+```
+
+
+#Line Plot
+```{r}
+revenue_by_month_tbl %>%
+    
+    ggplot(aes(year_month, revenue)) +
+    
+    geom_line(size = 0.5, linetype = 1) +
+    geom_smooth(method = "loess", span = 0.2)
+```
+
+
+#3.Bar / Column Plots
+
+#Goal：Sales by Descriptive Category
+
+#Data Manipulation
+```{r}
+revenue_by_category_2_tbl <- bike_orderlines_tbl %>%
+    
+    select(category_2, total_price) %>%
+    
+    group_by(category_2) %>%
+    summarize(revenue = sum(total_price)) %>%
+    ungroup()
+```
+
+
+#Bar Plot
+```{r}
+revenue_by_category_2_tbl %>%
+    
+    mutate(category_2 = category_2 %>% as_factor() %>% fct_reorder(revenue)) %>%
+    
+    ggplot(aes(category_2, revenue)) +
+    
+    geom_col(fill = "#2c3e50") + 
+    coord_flip()
+
+```
+
+
+#4.Histogram / Density Plots
+
+#Goal：Unit price of bicycles
+
+#Histogram
+```{r}
+bike_orderlines_tbl %>%
+    
+    distinct(model, price) %>%
+    
+    ggplot(aes(price)) +
+    
+    geom_histogram(bins = 25, fill = "blue", color = "white")
+```
+
+
+#Goal：Unit price of bicylce, segmenting by frame material
+
+#Histogram
+```{r}
+bike_orderlines_tbl %>%
+    
+    distinct(price, model, frame_material) %>%
+    
+    ggplot(aes(price, fill = frame_material)) +
+    
+    geom_histogram() +
+    
+    facet_wrap(~ frame_material, ncol = 1) +
+    
+    scale_fill_tq() +
+    theme_tq()
+```
+
+
+#Density
+```{r}
+bike_orderlines_tbl %>%
+    
+    distinct(price, model, frame_material) %>%
+    
+    ggplot(aes(price, fill = frame_material)) +
+    
+    geom_density(alpha = 0.5) +
+    # facet_wrap(~ frame_material, ncol = 1) +
+    
+    scale_fill_tq() +
+    theme_tq() +
+    theme(legend.position = "bottom")
+```
+
+
+#5.Box Plot / Violin Plot
+
+#Goal：Unit price of model, segmenting by category 2
+
+#Data Manipulation
+```{r}
+unit_price_by_cat_2_tbl <- bike_orderlines_tbl %>%
+    
+    select(category_2, model, price) %>%
+    distinct() %>%
+    
+    mutate(category_2 = as_factor(category_2) %>% fct_reorder(price))
+```
+
+
+#Box Plot
+```{r}
+unit_price_by_cat_2_tbl %>%
+    
+    ggplot(aes(category_2, price)) +
+    
+    geom_boxplot() +
+    coord_flip() +
+    theme_tq()
+```
+
+
+#Violin Plot & Jitter Plot
+```{r}
+unit_price_by_cat_2_tbl %>%
+    
+    ggplot(aes(category_2, price)) +
+    
+    geom_jitter(width = 0.15, color = "#2c3e50") +
+    geom_violin(alpha = 0.5) +
+    
+    coord_flip() +
+    theme_tq()
+```
+
+
+#6.Adding Text & Labels
+
+#Goal：Exposing sales over time, highlighting outlier
+
+#Data Manipulation
+```{r}
+revenue_by_year_tbl <- bike_orderlines_tbl %>%
+    
+    select(order_date, total_price) %>%
+    
+    mutate(year = year(order_date)) %>%
+    
+    group_by(year) %>%
+    summarize(revenue = sum(total_price)) %>%
+    ungroup()
+```
+
+
+#Adding text to bar chart
+
+#Filtering labels to highlight a point
+```{r}
+revenue_by_year_tbl %>%
+    
+    # mutate(revenue_text = scales::dollar(revenue, scale = 1e-6, suffix = "M")) %>%
+    
+    ggplot(aes(year, revenue)) +
+    
+    geom_col(fill = "#2c3e50") +
+    geom_smooth(method = "lm", se = FALSE) +
+    
+    geom_text(aes(label =  scales::dollar(revenue, scale = 1e-6, suffix = "M")), 
+              vjust = 1.5, color = "white") +
+    
+    geom_label(label =  "Major Demand This Year",
+               vjust = -0.5, 
+               size  = 5,
+               fill  = "#1f78b4",
+               color = "white",
+               fontface = "italic",
+               data = revenue_by_year_tbl %>%
+                   filter(year %in% c(2013))) + 
+    
+    expand_limits(y = 2e7) +
+    theme_tq()
+```
+
