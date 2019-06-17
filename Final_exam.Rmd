@@ -1,45 +1,59 @@
-rm(list=ls())
+---
+title: "Final exam"
+author: "張瑜君"
+date: "2019年6月17日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 
 #1.使用套件tidyquant, timetk，並讀入資料tej_day_price_2017_2018。
-
-
+```{r}
 library(tidyquant)
 library(timetk)
 
 stock_day_2_year<-read_tsv("D:/gittest/01/0617/data_wrangle_practice/tej_day_price_2017_2018.txt")
 
 glimpse(stock_day_2_year)
+```
+
 
 #2.選取欄位“證券代碼”, “簡稱”, “年月日”, “收盤價(元)”, “市值(百萬元)”, 並將名稱改為“id”, “name”, “date”, “price”, “cap”。
-
+```{r}
 price_day_2_year <- stock_day_2_year %>% 
-                    rename(id    = 證券代碼, 
-                           name  = 簡稱, 
-                           date  = 年月日, 
-                           price = `收盤價(元)`,
-                           cap   = `市值(百萬元)`
+                    rename(id    = '證券代碼', 
+                           name  = '簡稱', 
+                           date  = '年月日', 
+                           price = '收盤價(元)',
+                           cap   = '市值(百萬元)'
                            ) 
+glimpse(price_day_2_year)
+```
 
-dim(price_day_2_year)
 
 #3.選取id, date, price, 並將id改為文字格式，date改為日期格式，並將資料格式改為寬資料。
-
+```{r}
 price_day_2_year_1 <- stock_day_2_year %>% 
-                    rename(id    = 證券代碼, 
-                           name  = 簡稱, 
-                           date  = 年月日, 
-                           price = `收盤價(元)`,
-                           cap   = `市值(百萬元)`
+                    rename(id    = '證券代碼', 
+                           name  = '簡稱', 
+                           date  = '年月日', 
+                           price = '收盤價(元)',
+                           cap   = '市值(百萬元)'
                            ) %>% 
                     mutate(id = as.character(id)) %>%
                     mutate(date = as.Date(as.character(date), '%Y%m%d')) %>%
                     select(id, date, price) %>% 
                     spread(key = id, value = price) 
 
-dim(price_day_2_year_1)
+glimpse(price_day_2_year_1)
+```
+
 
 #4.檢查含有NA的股票代碼及其NA的個數。
-
+```{r}
 price_day_2_year_na <- price_day_2_year_1 %>% 
                        map_df(~sum(is.na(.))) %>% 
                        gather() %>% 
@@ -53,31 +67,38 @@ price_day_2_year_na.1 <- price_day_2_year_1 %>%
                          filter(value!=0)
 
 price_day_2_year_na.1
+```
+
 
 #5.將NA值以最近的股價取代。
-
+```{r}
 price_day_2_year_clear <-  price_day_2_year_1%>% 
                            na.locf(fromLast = TRUE, na.rm=FALSE) %>%
                            select(-c("2025", "6131"))
+price_day_2_year_clear
+```
+
 
 #6.刪除上題中仍含有NA值的股票, 並確認股票數量及筆數。
-
+```{r}
 dim(price_day_2_year_clear)
+```
 
-#7.將資料轉為xts, 計算日報酬率(以log計算), 並刪除第一筆沒有報酬率的資料。請顯示前五檔股票第1-5天的報酬率。
 
+#7.將資料轉為xts, 計算日報酬率(以log計算),並刪除第一筆沒有報酬率的資料。請顯示前五檔股票第1-5天的報酬率。
+```{r}
 ret_day_2_year <- price_day_2_year_clear %>% 
                   select(1:6) %>% 
                   tk_xts(select = -date, date_var = date) %>% 
                   Return.calculate(method = "log") %>%
                   na.omit()
 
-dim(ret_day_2_year)
-
 head(ret_day_2_year, 5)
+```
+
 
 #8.計算月報酬率(以log計算), 並刪除第一筆沒有報酬率的資料。請顯示前五檔股票第1-5天的報酬率。
-
+```{r}
 price_day_2_year.xts <- price_day_2_year_clear %>%
                         select(1:6) %>%
                         tk_xts(select = -date, date_var = date)  
@@ -89,13 +110,12 @@ ret_mon_2_year.xts <- price_day_2_year.xts %>%
                        Return.calculate(method = "log") %>%
                        na.omit()
 
-
-dim(ret_mon_2_year.xts)
-
 head(ret_mon_2_year.xts, 5)
+```
 
-#9.找出2017及2018年年底市值最大的前20家公司代碼, 簡稱, 並修改資本額格式，計算每家公司市值佔20家總市值的百分比。
 
+#9.找出2017及2018年年底市值最大的前20家公司代碼,簡稱,並修改資本額格式，計算每家公司市值佔20家總市值的百分比。
+```{r}
 tej <- read_tsv("D:/gittest/01/0617/data_wrangle_practice/tej_day_price_2017_2018.txt", col_names = TRUE)
 
 glimpse(tej)
@@ -109,25 +129,25 @@ tej1<-tej %>% select('證券代碼', '簡稱', '年月日', '市值(百萬元)')
   filter(cap > mean(cap)) %>% 
   slice(28805:28824, 1:20)
 
+tej1
+```
 
-filter()
 
+#10. 將2017年前20大公司市值以圖形表示如下。注意：市值由大小排列順序。
 
 #11.將題7的日報酬格式由寬格式改為長格式(如下),並只選取2018年的資料。
-
+```{r}
 ret_day_2_year.xts <- price_day_2_year_clear %>% 
                       tk_xts(select = -date, date_var = date) %>% 
                       Return.calculate(method = "log")
 
 ret_day_2_year_1 <- tk_tbl(ret_day_2_year.xts) %>% 
-                    gather(key = ret, value = id) 
+                    gather(key = ret, value = id)
+```
 
 
-#
+#12. 利用題9的20檔股票代碼，找出相對應20檔股票在2018年的日報酬率。
 
+#13. 依前題，計算20檔股票每月報酬率。提示：將每月中的每天報酬率加總，即可以得每月報酬率。利用as.yearmon()將日期轉為年月，並利用group_by(), summarize()計算分組報酬率總和。
 
-
-mutate(diff_1 = sales - sales_lag_1) %>%
-  mutate(pct_diff_1 = diff_1 / sales_lag_1) %>%
-  mutate(pct_diff_1_chr = scales::percent(pct_diff_1))
-
+#老師不好意思，花了很久的時間，也盡力做了，但還是做不出來。不好意思。
