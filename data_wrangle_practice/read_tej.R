@@ -4,7 +4,7 @@ library(timetk)
 
 rm(list=ls())
 #
-stock_day_2_year<-read_tsv("D:/gitest/gitest01/0610/data_wrangle_practice/tej_day_price_2017_2018.txt")
+stock_day_2_year<-read_tsv("data_wrangle_practice/tej_day_price_2017_2018.txt")
 #
 glimpse(stock_day_2_year)
 # data wrangling
@@ -40,7 +40,7 @@ price_day_2_year_clear <-  price_day_2_year %>%
                            na.locf(fromLast = TRUE, na.rm=FALSE) %>%
                            select(-c("2025", "6131"))
 dim(price_day_2_year_clear)
-# convert to daily return                         
+# convert to daily price                         
 ret_day_2_year <- price_day_2_year_clear %>% 
                   tk_xts(select = -date, date_var = date) %>% 
                   Return.calculate(method = "log")
